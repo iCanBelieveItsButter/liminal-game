@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "array": "cpp",
+        "istream": "cpp",
+        "locale": "cpp",
+        "tuple": "cpp",
+        "variant": "cpp",
+        "memory": "cpp"
+    },
+    "cmake.sourceDirectory": "/Users/gradenspeece/Desktop/frustrating/godot-cpp"
+}
