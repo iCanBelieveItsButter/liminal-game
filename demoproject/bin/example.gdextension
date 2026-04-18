@@ -1,0 +1,9 @@
+[configuration]
+
+entry_symbol = "hey_guys_init"
+compatibility_minimum = "4.2"
+
+[libraries]
+
+macos.debug = "res://bin/libgdexample.macos.template_debug.framework"
+macos.release = "res://bin/libgdexample.macos.template_debug.framework"
