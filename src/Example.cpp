@@ -14,7 +14,7 @@ Example::Example() {
     if (Engine::get_singleton()->is_editor_hint()) {
         set_process_mode(Node::ProcessMode::PROCESS_MODE_DISABLED);
     }
-    UtilityFunctions::print("testing");
+    UtilityFunctions::print("boo");
 }
 
 Example::~Example() {

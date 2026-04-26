@@ -1,4 +1,4 @@
-@tool
+#@tool
 extends Node3D
 
 #
@@ -13,24 +13,48 @@ extends Node3D
 #              001           101                          -Y
 
 @onready var m : MeshInstance3D = $MeshInstance3D
-@onready var slicer : MeshInstance3D = $slice_plane
-var size := 1.0
+@onready var slicer : MeshInstance3D = $Player/slice_plane
 
+@onready var lineMesh :=preload("res://addons/line/line_scene.tscn")
+@onready var slice_outline : Node3D = $sliceOutline
+var size := 1.0
 
 var cut_mode : int = 0
 
 ## cutting
-var tris : = []
-var cuts : = []
+var tris : Array = []
+var cuts : Array = []
+
+var p_l : Array = []
+
+## cpp
+var linecpp
 
 func _ready():
 	draw_cube()
+	
+	linecpp = line.new()
+	add_child(linecpp)
+	
+	linef(Vector3(0,0,0), Vector3(1,0,1), Color.BLACK, 0.0045)
 
 func _input(event):
-	if event.is_action_pressed("ui_accept"):
+	if event.is_action_pressed("l_c"):
 		var result = preform_slice()
 
-		m.mesh = result[0]
+		var new_mesh = result[0]
+		m.mesh = new_mesh
+		rebuild_tris_from_mesh(new_mesh)
+
+func  _process(delta):
+	var t = slicer.global_transform
+	var normal = t.basis.z.normalized()
+	var d = normal.dot(t.origin)
+	var p = Plane(normal,d)
+
+	
+	build_preview(p) 
+	preview_lines()
 
 func draw_cube():
 	tris.clear()
@@ -106,29 +130,41 @@ func preform_slice():
 	st_a.set_smooth_group(-1)
 	st_b.set_smooth_group(-1)
 	
-	for i in tris:
-		slice_tri(i[0], i[1], i[2], plane, st_a, st_b)
+	var count_a : = [0]
+	var count_b : = [0]
 	
-	draw_cap(st_a,plane, true)
-	draw_cap(st_b, plane, false)
+	for i in tris:
+		slice_tri(i[0], i[1], i[2], plane, st_a, st_b, count_a, count_b)
+	
+	draw_cap(st_a,plane, true, count_a, count_b)
+	draw_cap(st_b, plane, false, count_a, count_b)
 	
 	st_a.generate_normals()
 	st_b.generate_normals()
 	
 	var ma = st_a.commit()
 	var mb = st_b.commit()
-	return [ma, mb]
+	
+	var player_pos = slicer.global_transform.origin
+	var side = plane.distance_to(player_pos)
 
-func slice_tri(a, b, c, plane: Plane, st_a, st_b):
+	if side > 0:
+		return [mb]
+	else:
+		return [ma]
+
+func slice_tri(a, b, c, plane: Plane, st_a, st_b, c_a, c_b):
 	var da = plane.distance_to(a)
 	var db = plane.distance_to(b)
 	var dc = plane.distance_to(c)
 
 	if da >= 0 and db >= 0 and dc >= 0:
 		add_tri(st_a, a, b, c)
+		c_a[0]+= 1
 		return
 	if da < 0 and db < 0 and dc < 0:
 		add_tri(st_b, a, b, c)
+		c_b[0] += 1
 		return
 
 	var verts = [a, b, c]
@@ -158,14 +194,20 @@ func slice_tri(a, b, c, plane: Plane, st_a, st_b):
 
 	if d0 >= 0:
 		add_tri(st_a, v0, i1, i2)
+		c_a[0] += 1
 		add_tri(st_b, i1, v1, v2)
+		c_b[0] += 1
 		add_tri(st_b, i1, v2, i2)
+		c_b[0] += 1
 	else:
 		add_tri(st_b, v0, i1, i2)
+		c_b[0] += 1
 		add_tri(st_a, i1, v1, v2)
+		c_a[0] += 1
 		add_tri(st_a, i1, v2, i2)
+		c_a[0] += 1
 
-func draw_cap(st: SurfaceTool, plane,flip):
+func draw_cap(st: SurfaceTool, plane,flip,c_a, c_b):
 	if cuts.size() < 3: return
 
 	var n = plane.normal.normalized()
@@ -197,9 +239,74 @@ func draw_cap(st: SurfaceTool, plane,flip):
 
 		if flip:
 			add_tri(st, p0, p1, p2)
+			c_a[0] += 1
 		else:
 			add_tri(st, p0, p2, p1)
+			c_b[0] += 1
+
+func build_preview(plane):
+	p_l.clear()
+
+	for tri in tris:
+		var a = tri[0]
+		var b = tri[1]
+		var c = tri[2]
+
+		var da = plane.distance_to(a)
+		var db = plane.distance_to(b)
+		var dc = plane.distance_to(c)
+
+		var points := [] 
+
+		if da * db < 0:
+			points.append(intersect(a, b, da, db))
+		if db * dc < 0:
+			points.append(intersect(b, c, db, dc))
+		if dc * da < 0:
+			points.append(intersect(c, a, dc, da))
+
+		if points.size() == 2:
+			p_l.append(points)
+
+func preview_lines():
+	for c in slice_outline.get_children():
+		c.queue_free()
+
+	for seg in p_l:
+		linef(seg[0], seg[1], Color.BLACK, 0.0035)
+
+func rebuild_tris_from_mesh(m: ArrayMesh):
+	tris.clear()
+
+	var arrays = m.surface_get_arrays(0)
+	var verts = arrays[Mesh.ARRAY_VERTEX]
+
+	for i in range(0, verts.size(), 3):
+		tris.append([
+			verts[i],
+			verts[i + 1],
+			verts[i + 2]
+		])
 
 func intersect(a,b, da, db) -> Vector3:
 	var t = da / (da - db)
 	return a.lerp(b, t)
+
+## custom line drawing for thickness control
+func linef(a:Vector3,b:Vector3, color:Color, thickness:float):
+	var l = lineMesh.instantiate()
+	slice_outline.add_child(l)
+
+	## material
+	var mat = StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = color
+	l.material_override = mat
+	
+	## call cpp
+	linecpp.computeLine(a,b,color,thickness,l)
+
+## so we dont have to create a new instance every frame
+func updateLine(l, a,b,color, thickness):
+	linecpp.computeLine(a,b,color,thickness,l)
+	return

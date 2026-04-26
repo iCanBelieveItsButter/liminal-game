@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3 uid="uid://b5dtnxq6oorh3"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4ks8e"]
+no_depth_test = true
+shading_mode = 0
+
+[sub_resource type="BoxMesh" id="BoxMesh_u0c37"]
+material = SubResource("StandardMaterial3D_4ks8e")
+
+[node name="line" type="MeshInstance3D"]
+mesh = SubResource("BoxMesh_u0c37")
